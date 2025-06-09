@@ -122,7 +122,6 @@ export default function OnboardingScreen() {
   const contentOpacity = useSharedValue(1);
   const contentTranslateY = useSharedValue(0);
   const questionScale = useSharedValue(1);
-  const optionsOpacity = useSharedValue(0);
   
   // Loading screen animations
   const loadingProgress = useSharedValue(0);
@@ -137,6 +136,13 @@ export default function OnboardingScreen() {
   const sparkle5Opacity = useSharedValue(0);
   const sparkle6Opacity = useSharedValue(0);
 
+  // Initialize animation values for options (outside of render logic)
+  const currentQ = questions[currentQuestion];
+  const optionAnimations = currentQ.options.map(() => ({
+    opacity: useSharedValue(0),
+    translateY: useSharedValue(20)
+  }));
+
   // Initialize entrance animation
   useEffect(() => {
     contentOpacity.value = withTiming(1, {
@@ -149,11 +155,23 @@ export default function OnboardingScreen() {
       easing: Easing.out(Easing.cubic),
     });
 
-    // Fade in options after question appears
+    // Start staggered option animations after question appears
     setTimeout(() => {
-      optionsOpacity.value = withTiming(1, {
-        duration: 350,
-        easing: Easing.out(Easing.ease),
+      optionAnimations.forEach((animation, index) => {
+        animation.opacity.value = withDelay(
+          index * 120, // 120ms stagger delay
+          withTiming(1, {
+            duration: 350,
+            easing: Easing.bezier(0.25, 0.1, 0.25, 1), // Soft ease-in-out
+          })
+        );
+        animation.translateY.value = withDelay(
+          index * 120,
+          withTiming(0, {
+            duration: 350,
+            easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+          })
+        );
       });
     }, 250);
   }, []);
@@ -161,14 +179,29 @@ export default function OnboardingScreen() {
   // Animate options fade-in when question changes
   useEffect(() => {
     if (currentQuestion >= 0) {
-      // Reset options opacity
-      optionsOpacity.value = 0;
+      // Reset all option animations
+      optionAnimations.forEach((animation) => {
+        animation.opacity.value = 0;
+        animation.translateY.value = 20;
+      });
       
-      // Fade in options after a brief delay
+      // Start staggered animations after a brief delay
       setTimeout(() => {
-        optionsOpacity.value = withTiming(1, {
-          duration: 350,
-          easing: Easing.out(Easing.ease),
+        optionAnimations.forEach((animation, index) => {
+          animation.opacity.value = withDelay(
+            index * 120, // 120ms stagger delay
+            withTiming(1, {
+              duration: 350,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+            })
+          );
+          animation.translateY.value = withDelay(
+            index * 120,
+            withTiming(0, {
+              duration: 350,
+              easing: Easing.bezier(0.25, 0.1, 0.25, 1),
+            })
+          );
         });
       }, 250);
     }
@@ -335,12 +368,6 @@ export default function OnboardingScreen() {
     };
   });
 
-  const animatedOptionsStyle = useAnimatedStyle(() => {
-    return {
-      opacity: optionsOpacity.value,
-    };
-  });
-
   const animatedLoadingStyle = useAnimatedStyle(() => {
     return {
       transform: [{ scale: loadingScale.value }],
@@ -377,6 +404,14 @@ export default function OnboardingScreen() {
   const sparkle4Style = createSparkleStyle(sparkle4Opacity);
   const sparkle5Style = createSparkleStyle(sparkle5Opacity);
   const sparkle6Style = createSparkleStyle(sparkle6Opacity);
+
+  // Create animated styles for each option (outside of render logic)
+  const optionAnimatedStyles = optionAnimations.map((animation) => 
+    useAnimatedStyle(() => ({
+      opacity: animation.opacity.value,
+      transform: [{ translateY: animation.translateY.value }],
+    }))
+  );
 
   // Loading screen component
   if (showLoading) {
@@ -430,8 +465,6 @@ export default function OnboardingScreen() {
     );
   }
 
-  const currentQ = questions[currentQuestion];
-
   return (
     <LinearGradient colors={['#f8fafc', '#e2e8f0']} style={styles.container}>
       <SafeAreaView style={styles.safeArea}>
@@ -479,14 +512,17 @@ export default function OnboardingScreen() {
               )}
             </Animated.View>
 
-            <Animated.View style={[styles.optionsContainer, animatedOptionsStyle]}>
+            <View style={styles.optionsContainer}>
               {currentQ.options.map((option, index) => {
                 const IconComponent = option.icon;
                 const isSelected = selectedOption === option.text;
                 const isEnergyQuestion = currentQuestion === 0;
                 
                 return (
-                  <View key={`${currentQuestion}-${index}`}>
+                  <Animated.View 
+                    key={`${currentQuestion}-${index}`}
+                    style={optionAnimatedStyles[index]}
+                  >
                     <TouchableOpacity
                       style={[
                         styles.optionCard,
@@ -545,10 +581,10 @@ export default function OnboardingScreen() {
                         </Animated.View>
                       )}
                     </TouchableOpacity>
-                  </View>
+                  </Animated.View>
                 );
               })}
-            </Animated.View>
+            </View>
           </ScrollView>
         </Animated.View>
 
